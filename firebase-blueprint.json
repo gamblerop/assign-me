@@ -1,0 +1,136 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "points": { "type": "number" },
+        "ordersCount": { "type": "number" },
+        "joined": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["id", "name", "email", "points", "ordersCount", "joined", "role"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Order placement document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "userType": { "type": "string" },
+        "hostel": { "type": "string" },
+        "pickup": { "type": "string" },
+        "delivery": { "type": "string" },
+        "service": { "type": "string" },
+        "manualType": { "type": "string" },
+        "handwriting": { "type": "string" },
+        "qty": { "type": "string" },
+        "qtyValue": { "type": "number" },
+        "content": { "type": "string" },
+        "deliveryDate": { "type": "string" },
+        "urgent": { "type": "boolean" },
+        "basePrice": { "type": "number" },
+        "urgentFee": { "type": "number" },
+        "discount": { "type": "number" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Completed", "Rejected"] },
+        "createdAt": { "type": "string" },
+        "images": { "type": "array" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "name", "userType", "service", "handwriting", "qty", "qtyValue", "content", "deliveryDate", "urgent", "basePrice", "urgentFee", "discount", "total", "status", "createdAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "User review document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "userId": { "type": "string" },
+        "stars": { "type": "number" },
+        "text": { "type": "string" },
+        "received": { "type": "boolean" },
+        "date": { "type": "string" },
+        "imageUrl": { "type": "string" }
+      },
+      "required": ["id", "name", "stars", "text", "received", "date"]
+    },
+    "Hostel": {
+      "title": "Hostel",
+      "description": "Hostel document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "receiver": { "type": "string" },
+        "ordersCount": { "type": "number" },
+        "revenue": { "type": "number" }
+      },
+      "required": ["id", "name", "receiver", "ordersCount", "revenue"]
+    },
+    "SystemNotification": {
+      "title": "SystemNotification",
+      "description": "System notification document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "desc": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "read": { "type": "boolean" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "title", "desc", "type", "createdAt", "read"]
+    },
+    "ServiceItem": {
+      "title": "ServiceItem",
+      "description": "Service menu item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "unit": { "type": "string" },
+        "features": { "type": "array" }
+      },
+      "required": ["id", "name", "description", "price", "unit", "features"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile collection"
+    },
+    "orders/{orderId}": {
+      "schema": "Order",
+      "description": "Orders collection"
+    },
+    "reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Reviews collection"
+    },
+    "hostels/{hostelId}": {
+      "schema": "Hostel",
+      "description": "Hostels collection"
+    },
+    "notifications/{notificationId}": {
+      "schema": "SystemNotification",
+      "description": "Notifications collection"
+    },
+    "services/{serviceId}": {
+      "schema": "ServiceItem",
+      "description": "Services collection"
+    }
+  }
+}

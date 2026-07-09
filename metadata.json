@@ -1,0 +1,6 @@
+{
+  "name": "Assign Me",
+  "description": "A professional platform for students to place assignment orders, track rewards, and write reviews, with an admin panel for order management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
