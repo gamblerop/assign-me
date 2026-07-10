@@ -1,13 +1,8 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
-import { 
-  onAuthStateChanged, 
-  signOut, 
-  GoogleAuthProvider, 
-  signInWithPopup 
-} from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { getUserProfile, seedInitialData } from './services/dbService';
+import { getUserProfile, seedInitialData, createUserProfile } from './services/dbService';
 import { UserProfile, SystemNotification } from './types';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -25,26 +20,6 @@ export default function App() {
   const [portal, setPortal] = useState<'user' | 'admin'>('user');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const googleProvider = new GoogleAuthProvider();
-
-const handleAdminGoogleLogin = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-
-    const email = result.user.email;
-
-    if (email !== "gamblerop18@gmail.com") {
-      alert("Access denied");
-      await signOut(auth);
-      return;
-    }
-
-    setPortal("admin");
-
-  } catch (error) {
-    console.log(error);
-  }
-};
   
   // Real-time notification lists (for toast popups)
   const [notifs, setNotifs] = useState<SystemNotification[]>([]);
@@ -58,7 +33,7 @@ const handleAdminGoogleLogin = async () => {
   // 2. Track Firebase auth changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      const adminStored = false;``
+      const adminStored = sessionStorage.getItem('adminAuth') === 'true';
       if (adminStored) {
         // Setup mock admin profile to bypass Email/Password disabled providers
         const adminProfile: UserProfile = {
@@ -96,7 +71,18 @@ const handleAdminGoogleLogin = async () => {
 
       if (authUser) {
         // Fetch matching profile
-        const profile = await getUserProfile(authUser.uid);
+        let profile = await getUserProfile(authUser.uid);
+        if (!profile) {
+          try {
+            profile = await createUserProfile(authUser.uid, {
+              name: authUser.displayName || 'Google User',
+              email: authUser.email || '',
+              phone: authUser.phoneNumber || ''
+            });
+          } catch (e) {
+            console.error('Failed to auto-create user profile on state change:', e);
+          }
+        }
         if (profile) {
           if (profile.email === 'gamblerop18@gmail.com' || profile.email === 'admin@assignme.in') {
             profile.role = 'admin';
@@ -153,11 +139,14 @@ const handleAdminGoogleLogin = async () => {
       const adminPaths = ['/admin', '/dashboard', '/admin-dashboard'];
       const adminHashes = ['#admin', '#dashboard', '#admin-dashboard'];
       
-      const isAdminAuth = userProfile?.email === "gamblerop18@gmail.com";
+      const isAdminAuth = sessionStorage.getItem('adminAuth') === 'true' && userProfile?.role === 'admin';
       
       if (adminPaths.includes(path) || adminHashes.includes(hash)) {
         if (!isAdminAuth) {
-          handleAdminGoogleLogin();
+          // If not authenticated as admin, clean up URL and redirect to home, showing login modal
+          window.history.replaceState({}, '', '/');
+          setPortal('user');
+          setAuthModalOpen(true);
         } else {
           setPortal('admin');
         }

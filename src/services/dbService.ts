@@ -91,7 +91,7 @@ export async function seedInitialData() {
 }
 
 // User profile helpers
-export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+export async function getUserProfile(uid: string , data: Omit<UserProfile, 'id' | 'points' | 'ordersCount' | 'role' | 'joined'>): Promise<UserProfile | null> {
   const docSnap = await getDoc(doc(db, 'users', uid));
   if (docSnap.exists()) {
     return docSnap.data() as UserProfile;

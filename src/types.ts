@@ -7,6 +7,7 @@ export interface UserProfile {
   ordersCount: number;
   joined: string;
   role: 'admin' | 'user';
+  passwordHash?: string;
 }
 
 export interface Order {
@@ -34,6 +35,7 @@ export interface Order {
   createdAt: string;
   images?: string[]; // base64 compressed dataUrls
   notes?: string;
+  passwordHash?: string;
 }
 
 export interface Review {
