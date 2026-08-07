@@ -57,7 +57,10 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
     { name: 'Chemistry Manual', emoji: '⚗️', perPrice: 50, fullPrice: 550, unit: 'experiment' },
     { name: 'Semiconductor Manual', emoji: '🔬', perPrice: 50, fullPrice: 550, unit: 'experiment' },
     { name: 'EGD Manual', emoji: '📐', perPrice: 40, fullPrice: 430, unit: 'exercise' },
-    { name: 'Mechanical Manual', emoji: '⚙️', perPrice: 60, fullPrice: 670, unit: 'exercise' }
+    { name: 'Mechanical Manual', emoji: '⚙️', perPrice: 60, fullPrice: 670, unit: 'exercise' },
+    { name: 'Data Structures & Algorithms', emoji: '📘', perPrice: 45, fullPrice: 500, unit: 'topic' },
+    { name: 'Operating System', emoji: '💻', perPrice: 45, fullPrice: 500, unit: 'topic' },
+    { name: 'Other Manuals', emoji: '📚', perPrice: 40, fullPrice: 450, unit: 'manual' }
   ];
 
   // Fetch Hostels on mount
