@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createOrder } from '../services/dbService';
-import { db, storage } from '../firebase';
+import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ChevronRight, ChevronLeft, MapPin, Search, User, Clipboard, Sliders, Calendar, 
-  CheckCircle, Upload, FileText, Image as ImageIcon, Loader2, Sparkles, 
-  ExternalLink, RefreshCw, Trash2 
+  CheckCircle 
 } from 'lucide-react';
 
 // =========================================================================
@@ -43,21 +41,10 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
   const [manualFullPrice, setManualFullPrice] = useState(0);
   const [fullManual, setFullManual] = useState(false);
   const [qty, setQty] = useState(10);
-  const [content, setContent] = useState<'Upload' | 'AI Content'>('Upload');
 
-  // Feature 1: Upload Reference Photo states
+  // Order Details & Instructions
   const [draftOrderId, setDraftOrderId] = useState(() => '#AM' + Math.floor(100000 + Math.random() * 900000));
-  const [referenceFile, setReferenceFile] = useState<File | null>(null);
-  const [referenceFileName, setReferenceFileName] = useState('');
-  const [referenceFileSize, setReferenceFileSize] = useState('');
-  const [referenceFileUrl, setReferenceFileUrl] = useState('');
-  const [referenceFilePreview, setReferenceFilePreview] = useState('');
-  const [isUploadingFile, setIsUploadingFile] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [notes, setNotes] = useState('');
-
-  // Feature 2: AI Content Generation states
-  const [aiContentDescription, setAiContentDescription] = useState('');
+  const [instructions, setInstructions] = useState('');
 
   // Step 6
   const [deliveryDate, setDeliveryDate] = useState('');
@@ -174,72 +161,6 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
 
   }, [service, servicePrice, manualType, fullManual, manualFullPrice, manualPerPrice, qty, isTomorrow, userProfile]);
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadError('');
-
-    const validExtensions = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const isImage = file.type.startsWith('image/');
-    const isPdf = file.type === 'application/pdf' || ext === 'pdf';
-
-    if (!isImage && !isPdf && !validExtensions.includes(ext)) {
-      setUploadError('Invalid format. Please upload an image (JPG, PNG, WEBP) or a PDF file.');
-      return;
-    }
-
-    if (file.size > 25 * 1024 * 1024) {
-      setUploadError('File size exceeds 25MB limit.');
-      return;
-    }
-
-    setReferenceFile(file);
-    setReferenceFileName(file.name);
-    setReferenceFileSize(formatFileSize(file.size));
-
-    if (isImage) {
-      setReferenceFilePreview(URL.createObjectURL(file));
-    } else {
-      setReferenceFilePreview('');
-    }
-
-    setIsUploadingFile(true);
-    try {
-      const uid = userProfile?.id || (userProfile?.email ? userProfile.email.replace(/[^a-zA-Z0-9]/g, '_') : 'guest_' + Math.random().toString(36).substring(2, 8));
-      const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const storagePath = `orders/${uid}/${draftOrderId}/${Date.now()}_${cleanFileName}`;
-      const storageRef = ref(storage, storagePath);
-
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      setReferenceFileUrl(downloadUrl);
-    } catch (err: any) {
-      console.error('Firebase Storage upload failed:', err);
-      setUploadError(err?.message || 'Failed to upload to Firebase Storage. Please verify storage permissions.');
-    } finally {
-      setIsUploadingFile(false);
-    }
-  };
-
-  const handleRemoveFile = () => {
-    setReferenceFile(null);
-    setReferenceFileName('');
-    setReferenceFileSize('');
-    setReferenceFileUrl('');
-    setReferenceFilePreview('');
-    setUploadError('');
-  };
-
   const handleDateSelect = (dObj: Date, dStr: string) => {
     setDeliveryDate(dStr);
     const tomorrow = new Date();
@@ -277,24 +198,9 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
         alert('Please select a manual type.');
         return;
       }
-      if (content === 'Upload') {
-        if (!referenceFileUrl && !referenceFile) {
-          alert('Please upload a reference photo or PDF before proceeding.');
-          return;
-        }
-        if (isUploadingFile) {
-          alert('Please wait for the file to finish uploading to Firebase Storage.');
-          return;
-        }
-        if (!notes.trim()) {
-          alert('Please add notes describing what you want in your assignment.');
-          return;
-        }
-      } else if (content === 'AI Content') {
-        if (!aiContentDescription.trim()) {
-          alert('Please describe what you want the content to cover.');
-          return;
-        }
+      if (!instructions.trim() || instructions.trim().length < 10) {
+        alert('Please enter your order instructions (at least 10 characters) describing what you need.');
+        return;
       }
     }
     if (step === 6) {
@@ -341,11 +247,8 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
         handwriting,
         qty: orderLabelQty,
         qtyValue: qty,
-        content,
-        referenceFileUrl: content === 'Upload' ? referenceFileUrl : '',
-        referenceFileName: content === 'Upload' ? referenceFileName : '',
-        notes: content === 'Upload' ? notes.trim() : '',
-        aiContentDescription: content === 'AI Content' ? aiContentDescription.trim() : '',
+        instructions: instructions.trim(),
+        notes: instructions.trim(),
         deliveryDate,
         urgent: isTomorrow,
         basePrice,
@@ -356,17 +259,7 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
 
       await createOrder(orderData);
 
-      // Construct WhatsApp message with complete specs
-      let contentSection = '';
-      if (content === 'Upload') {
-        contentSection = `*Content Source:* Reference Photo / PDF Upload
-*Notes:* ${notes.trim()}
-*Reference File Link:* ${referenceFileUrl || 'Attached in system'}`;
-      } else {
-        contentSection = `*Content Source:* AI Generated Content
-*AI Description:* ${aiContentDescription.trim()}`;
-      }
-
+      // Construct WhatsApp message with formatted order specs and instructions
       const orderSummaryText = `Hi Assign Me! I just placed an assignment order.
 
 *Order ID:* ${draftOrderId}
@@ -375,9 +268,13 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
 *Location:* ${userType === 'Hosteller' ? hostel : deliveryPoint}
 *Handwriting:* ${handwriting}
 *Service:* ${service === 'Manuals' ? manualType : service} (${orderLabelQty})
-${contentSection}
+*Instructions:*
+${instructions.trim()}
+
 *Delivery Date:* ${deliveryDate}
 *Total Price:* ₹${total} (Base: ₹${basePrice}, Urgent Fee: ₹${urgentFee}, Discount: ₹${discount})
+
+📎 If you have reference photos/documents, please attach them here in this chat.
 
 Please confirm my order. Thank you!`;
 
@@ -395,15 +292,7 @@ Please confirm my order. Thank you!`;
       setManualType('');
       setFullManual(false);
       setQty(10);
-      setContent('Upload');
-      setReferenceFile(null);
-      setReferenceFileName('');
-      setReferenceFileSize('');
-      setReferenceFileUrl('');
-      setReferenceFilePreview('');
-      setNotes('');
-      setAiContentDescription('');
-      setUploadError('');
+      setInstructions('');
       setDeliveryDate('');
       setIsTomorrow(false);
     } catch (err) {
@@ -810,215 +699,40 @@ Please confirm my order. Thank you!`;
                     </div>
                   )}
 
-                  <div className="pt-2 space-y-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#7da3cc] mb-2 uppercase tracking-wider">
-                        Content Source
+                  {/* Single Clean Instructions Box */}
+                  <div className="pt-2 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-[#7da3cc] uppercase tracking-wider">
+                        ORDER INSTRUCTIONS <span className="text-red-400">*</span>
                       </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setContent('Upload')}
-                          className={`p-3.5 bg-[#0a1f38] border rounded-xl text-center cursor-pointer transition-all flex items-center justify-center gap-2 ${
-                            content === 'Upload' 
-                              ? 'border-[#1a6fff] bg-[#1a6fff]/10 text-white shadow-sm shadow-[#1a6fff]/20 font-semibold' 
-                              : 'border-[#0d2d50] text-[#7da3cc] hover:border-[#1a6fff]/40 hover:text-white'
-                          }`}
-                        >
-                          <Upload className="w-4 h-4 text-[#1a6fff]" />
-                          <span>Upload Reference Photo</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setContent('AI Content')}
-                          className={`p-3.5 bg-[#0a1f38] border rounded-xl text-center cursor-pointer transition-all flex items-center justify-center gap-2 ${
-                            content === 'AI Content' 
-                              ? 'border-[#1a6fff] bg-[#1a6fff]/10 text-white shadow-sm shadow-[#1a6fff]/20 font-semibold' 
-                              : 'border-[#0d2d50] text-[#7da3cc] hover:border-[#1a6fff]/40 hover:text-white'
-                          }`}
-                        >
-                          <Sparkles className="w-4 h-4 text-[#00cfff]" />
-                          <span>Let AI Generate Content</span>
-                        </button>
-                      </div>
+                      <span className="text-[10px] text-[#7da3cc]">
+                        {instructions.trim().length < 10 ? (
+                          <span className="text-amber-400 font-medium">Min 10 chars ({instructions.trim().length}/10)</span>
+                        ) : (
+                          <span className="text-emerald-400 font-medium">✓ Ready ({instructions.trim().length} chars)</span>
+                        )}
+                      </span>
                     </div>
 
-                    {/* FEATURE 1: Upload Reference Photo Flow */}
-                    {content === 'Upload' && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        className="space-y-4 pt-1"
-                      >
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="block text-xs font-semibold text-[#7da3cc] uppercase tracking-wider">
-                              Reference Document (JPG, PNG, PDF) <span className="text-red-400">*</span>
-                            </label>
-                            {referenceFileUrl && (
-                              <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
-                                <CheckCircle className="w-3.5 h-3.5" /> Stored in Firebase
-                              </span>
-                            )}
-                          </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-white mb-2">
+                        Tell us what you need
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={instructions}
+                        onChange={(e) => setInstructions(e.target.value)}
+                        placeholder="e.g. Please write this for my Physics assignment, use blue pen style, include diagrams where needed..."
+                        className="w-full bg-[#0a1f38] border border-[#0d2d50] focus:border-[#1a6fff] focus:ring-1 focus:ring-[#1a6fff] rounded-xl p-3.5 text-xs text-white placeholder-[#7da3cc]/60 outline-none transition-all duration-200 resize-y"
+                      />
+                    </div>
 
-                          {/* Hidden File Input */}
-                          <input
-                            type="file"
-                            id="order-reference-file-input"
-                            accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
-                            onChange={handleFileSelect}
-                            className="hidden"
-                            disabled={isUploadingFile}
-                          />
-
-                          {/* Upload Dropzone / Loading / File Preview */}
-                          {!referenceFile && !isUploadingFile ? (
-                            <label
-                              htmlFor="order-reference-file-input"
-                              className="border-2 border-dashed border-[#0d2d50] hover:border-[#1a6fff] bg-[#0a1f38] hover:bg-[#0c2442] rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group text-center"
-                            >
-                              <div className="w-12 h-12 rounded-xl bg-[#071628] border border-[#0d2d50] group-hover:border-[#1a6fff] flex items-center justify-center text-[#1a6fff] mb-2.5 transition-colors">
-                                <Upload className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                              </div>
-                              <div className="text-xs font-bold text-white font-syne group-hover:text-[#00cfff] transition-colors">
-                                Click to select reference file or drag &amp; drop
-                              </div>
-                              <p className="text-[11px] text-[#7da3cc] mt-1">
-                                Supports images (JPG, PNG, WEBP) and PDF files up to 25MB
-                              </p>
-                            </label>
-                          ) : isUploadingFile ? (
-                            <div className="bg-[#0a1f38] border border-[#1a6fff]/40 rounded-xl p-6 flex flex-col items-center justify-center text-center">
-                              <Loader2 className="w-8 h-8 text-[#1a6fff] animate-spin mb-2.5" />
-                              <div className="text-xs font-bold text-white font-syne">
-                                Uploading to Firebase Storage...
-                              </div>
-                              <p className="text-[11px] text-[#7da3cc] mt-1">
-                                Storing under orders/{userProfile?.id || 'guest'}/{draftOrderId}/{referenceFileName}
-                              </p>
-                            </div>
-                          ) : (
-                            /* Uploaded preview thumbnail and remove/replace actions */
-                            <div className="bg-[#0a1f38] border border-[#1a6fff]/60 rounded-xl p-3.5 transition-all">
-                              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                  {referenceFilePreview ? (
-                                    <div className="w-14 h-14 rounded-lg bg-[#071628] border border-[#0d2d50] overflow-hidden flex-shrink-0 relative">
-                                      <img
-                                        src={referenceFilePreview}
-                                        alt="Reference thumbnail"
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-                                  ) : (
-                                    <div className="w-14 h-14 rounded-lg bg-red-500/10 border border-red-500/30 flex flex-col items-center justify-center text-red-400 flex-shrink-0">
-                                      <FileText className="w-6 h-6" />
-                                      <span className="text-[9px] font-bold mt-0.5 uppercase">PDF</span>
-                                    </div>
-                                  )}
-
-                                  <div className="overflow-hidden">
-                                    <div className="text-xs font-bold text-white truncate max-w-[220px] sm:max-w-xs font-syne">
-                                      {referenceFileName}
-                                    </div>
-                                    <div className="text-[10px] text-[#7da3cc] mt-0.5">
-                                      {referenceFileSize && <span>{referenceFileSize} • </span>}
-                                      <span className="text-emerald-400">Ready for order</span>
-                                    </div>
-                                    {referenceFileUrl && (
-                                      <a
-                                        href={referenceFileUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-[11px] text-[#00cfff] hover:underline inline-flex items-center gap-1 mt-1"
-                                      >
-                                        <span>View uploaded file</span>
-                                        <ExternalLink className="w-3 h-3" />
-                                      </a>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
-                                  <label
-                                    htmlFor="order-reference-file-input"
-                                    className="px-3 py-1.5 rounded-lg bg-[#071628] hover:bg-[#0d2645] border border-[#0d2d50] hover:border-[#1a6fff] text-white text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 transition-all"
-                                  >
-                                    <RefreshCw className="w-3.5 h-3.5 text-[#1a6fff]" />
-                                    <span>Replace</span>
-                                  </label>
-                                  <button
-                                    type="button"
-                                    onClick={handleRemoveFile}
-                                    className="p-1.5 rounded-lg bg-[#071628] hover:bg-red-500/20 border border-[#0d2d50] hover:border-red-500/50 text-red-400 transition-all cursor-pointer"
-                                    title="Remove file"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {uploadError && (
-                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2">
-                              <span>⚠️</span>
-                              <span>{uploadError}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Notes Textarea */}
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <label className="block text-xs font-semibold text-[#7da3cc] uppercase tracking-wider">
-                              Notes <span className="text-red-400">*</span>
-                            </label>
-                            <span className="text-[10px] text-[#7da3cc]">Required</span>
-                          </div>
-                          <textarea
-                            rows={3}
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="e.g. I want this in my assignment"
-                            className="w-full bg-[#0a1f38] border border-[#0d2d50] focus:border-[#1a6fff] rounded-xl p-3 text-xs text-white placeholder-[#7da3cc]/50 outline-none transition-colors"
-                          />
-                          <p className="text-[10px] text-[#7da3cc]">
-                            Add instructions, page numbers, or key formatting requirements alongside your photo.
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* FEATURE 2: Let AI Generate Content Flow */}
-                    {content === 'AI Content' && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        className="space-y-2 pt-1"
-                      >
-                        <div className="flex items-center justify-between">
-                          <label className="block text-xs font-semibold text-[#7da3cc] uppercase tracking-wider flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5 text-[#00cfff]" />
-                            <span>Describe what you want the content to cover <span className="text-red-400">*</span></span>
-                          </label>
-                          <span className="text-[10px] text-[#7da3cc]">Required</span>
-                        </div>
-                        <textarea
-                          rows={4}
-                          value={aiContentDescription}
-                          onChange={(e) => setAiContentDescription(e.target.value)}
-                          placeholder="Describe what you want the content to cover (e.g. Topic title, syllabus questions, key sections, or code samples)"
-                          className="w-full bg-[#0a1f38] border border-[#0d2d50] focus:border-[#1a6fff] rounded-xl p-3.5 text-xs text-white placeholder-[#7da3cc]/50 outline-none transition-colors"
-                        />
-                        <p className="text-[10px] text-[#7da3cc] leading-relaxed">
-                          ✨ Our AI system will draft and format academic material according to this description before handwritten transcription.
-                        </p>
-                      </motion.div>
-                    )}
+                    <div className="flex items-start gap-2.5 p-3.5 bg-[#071628] border border-[#0d2d50] rounded-xl text-xs text-[#7da3cc]">
+                      <span className="text-base leading-none select-none">📎</span>
+                      <p className="text-[11px] leading-relaxed text-[#7da3cc]">
+                        Have reference photos or documents? You can attach them directly in the WhatsApp chat after submitting.
+                      </p>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -1149,40 +863,12 @@ Please confirm my order. Thank you!`;
                         {fullManual ? 'Full Manual' : `${qty} sheets / pages`}
                       </span>
                     </div>
-                    <div className="flex justify-between text-[#7da3cc]">
-                      <span>Content Source</span>
-                      <span className="text-white font-medium">{content === 'Upload' ? 'Reference File Upload' : 'AI Generated Content'}</span>
+                    <div className="flex justify-between text-[#7da3cc] items-start gap-4">
+                      <span className="flex-shrink-0">Order Instructions</span>
+                      <span className="text-white font-medium text-right max-w-[220px] text-xs break-words line-clamp-3" title={instructions}>
+                        {instructions}
+                      </span>
                     </div>
-                    {content === 'Upload' ? (
-                      <>
-                        <div className="flex justify-between text-[#7da3cc] items-center">
-                          <span>Reference File</span>
-                          <div className="text-right">
-                            <span className="text-white font-medium block truncate max-w-[180px] sm:max-w-xs">{referenceFileName || 'Uploaded File'}</span>
-                            {referenceFileUrl && (
-                              <a
-                                href={referenceFileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[10px] text-[#00cfff] hover:underline inline-flex items-center gap-1"
-                              >
-                                <span>Preview Storage Link</span>
-                                <ExternalLink className="w-2.5 h-2.5" />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex justify-between text-[#7da3cc]">
-                          <span>Notes</span>
-                          <span className="text-white font-medium text-right max-w-[200px] truncate">{notes}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex justify-between text-[#7da3cc]">
-                        <span>AI Topic Instructions</span>
-                        <span className="text-white font-medium text-right max-w-[200px] truncate">{aiContentDescription}</span>
-                      </div>
-                    )}
                     <div className="flex justify-between text-[#7da3cc]">
                       <span>Delivery Target Date</span>
                       <span className="text-white font-medium">{deliveryDate}</span>
