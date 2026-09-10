@@ -7,12 +7,9 @@ import { UserProfile, SystemNotification } from './types';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
 import Pricing from './components/Pricing';
-import ManualSection from './components/ManualSection';
-import ManualDetailPage from './components/ManualDetailPage';
 import OrderWizard from './components/OrderWizard';
 import RewardsSection from './components/RewardsSection';
 import ReviewSection from './components/ReviewSection';
-import PhotoUploadSection from './components/PhotoUploadSection';
 import AuthModal from './components/AuthModal';
 import AdminPortal from './components/AdminPortal';
 import { motion, AnimatePresence } from 'motion/react';
@@ -22,7 +19,6 @@ export default function App() {
   const [portal, setPortal] = useState<'user' | 'admin'>('user');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [currentRoute, setCurrentRoute] = useState<string>(window.location.pathname);
   
   // Real-time notification lists (for toast popups)
   const [notifs, setNotifs] = useState<SystemNotification[]>([]);
@@ -134,12 +130,11 @@ export default function App() {
     return () => unsubscribe();
   }, [userProfile]);
 
-  // 4. Manual Route / Hash Interceptor (Route Protection)
+  // 4. Admin Route / Hash Interceptor (Route Protection)
   useEffect(() => {
     const checkRoute = () => {
       const path = window.location.pathname;
       const hash = window.location.hash;
-      setCurrentRoute(path);
 
       const adminPaths = ['/admin', '/dashboard', '/admin-dashboard'];
       const adminHashes = ['#admin', '#dashboard', '#admin-dashboard'];
@@ -150,7 +145,6 @@ export default function App() {
         if (!isAdminAuth) {
           // If not authenticated as admin, clean up URL and redirect to home, showing login modal
           window.history.replaceState({}, '', '/');
-          setCurrentRoute('/');
           setPortal('user');
           setAuthModalOpen(true);
         } else {
@@ -210,9 +204,6 @@ export default function App() {
       .slice(0, 2);
   };
 
-  const isManualRoute = currentRoute.startsWith('/manual/');
-  const manualSlug = isManualRoute ? currentRoute.replace('/manual/', '') : '';
-
   return (
     <div className="min-h-screen bg-[#020b18] text-[#e8f0fe] flex flex-col justify-between font-sans selection:bg-[#1a6fff]/30">
       
@@ -250,14 +241,7 @@ export default function App() {
       <nav className="flex items-center justify-between px-6 md:px-14 lg:px-20 py-4.5 border-b border-[#0d2d50] sticky top-0 z-[100] bg-[#020b18]/92 backdrop-blur-md">
         <div 
           className="flex items-center gap-3.5 cursor-pointer" 
-          onClick={() => {
-            if (isManualRoute) {
-              window.history.pushState({}, '', '/');
-              setCurrentRoute('/');
-            } else {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-          }}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         >
           <div className="w-9 h-9 bg-[#1a6fff] rounded-xl flex items-center justify-center font-syne font-extrabold text-sm text-white shadow-md shadow-[#1a6fff]/20">
             AM
@@ -269,22 +253,6 @@ export default function App() {
 
         {/* Links */}
         <ul className="hidden md:flex items-center gap-8 list-none text-xs font-bold tracking-wide uppercase">
-          <li>
-            <a 
-              href="#manuals" 
-              onClick={(e) => {
-                if (isManualRoute) {
-                  e.preventDefault();
-                  window.history.pushState({}, '', '/#manuals');
-                  setCurrentRoute('/');
-                  setTimeout(() => document.getElementById('manuals')?.scrollIntoView({ behavior: 'smooth' }), 100);
-                }
-              }}
-              className="text-[#7da3cc] hover:text-white transition-colors duration-200"
-            >
-              Manuals
-            </a>
-          </li>
           <li>
             <a href="#pricing" className="text-[#7da3cc] hover:text-white transition-colors duration-200">
               Pricing
@@ -303,11 +271,6 @@ export default function App() {
           <li>
             <a href="#reviews" className="text-[#7da3cc] hover:text-white transition-colors duration-200">
               Reviews
-            </a>
-          </li>
-          <li>
-            <a href="#upload-section" className="text-[#7da3cc] hover:text-white transition-colors duration-200">
-              Upload Photo
             </a>
           </li>
         </ul>
@@ -340,15 +303,7 @@ export default function App() {
           )}
 
           <button
-            onClick={() => {
-              if (isManualRoute) {
-                window.history.pushState({}, '', '/#order');
-                setCurrentRoute('/');
-                setTimeout(() => document.getElementById('order')?.scrollIntoView({ behavior: 'smooth' }), 100);
-              } else {
-                document.getElementById('order')?.scrollIntoView({ behavior: 'smooth' });
-              }
-            }}
+            onClick={() => document.getElementById('order')?.scrollIntoView({ behavior: 'smooth' })}
             className="hidden sm:inline-block bg-[#1a6fff] hover:bg-[#1558cc] text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer shadow-lg shadow-[#1a6fff]/20 hover:shadow-[#1a6fff]/30 duration-200"
           >
             Start Order
@@ -358,36 +313,12 @@ export default function App() {
 
       {/* CORE PORTAL CONTAINER */}
       <main className="flex-grow">
-        {isManualRoute ? (
-          <ManualDetailPage 
-            manualId={manualSlug} 
-            onBack={() => {
-              window.history.pushState({}, '', '/');
-              setCurrentRoute('/');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOrderNow={() => {
-              window.history.pushState({}, '', '/#order');
-              setCurrentRoute('/');
-              setTimeout(() => document.getElementById('order')?.scrollIntoView({ behavior: 'smooth' }), 100);
-            }}
-          />
-        ) : (
-          <>
-            <Hero onStartOrder={() => document.getElementById('order')?.scrollIntoView({ behavior: 'smooth' })} />
-            <HowItWorks />
-            <Pricing />
-            <ManualSection onNavigate={(route) => {
-              window.history.pushState({}, '', route);
-              setCurrentRoute(route);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }} />
-            <OrderWizard userProfile={userProfile} onOrderSuccess={handleOrderSuccess} />
-            <RewardsSection userProfile={userProfile} onLoginClick={() => setAuthModalOpen(true)} />
-            <ReviewSection userProfile={userProfile} onLoginClick={() => setAuthModalOpen(true)} />
-            <PhotoUploadSection />
-          </>
-        )}
+        <Hero onStartOrder={() => document.getElementById('order')?.scrollIntoView({ behavior: 'smooth' })} />
+        <HowItWorks />
+        <Pricing />
+        <OrderWizard userProfile={userProfile} onOrderSuccess={handleOrderSuccess} />
+        <RewardsSection userProfile={userProfile} onLoginClick={() => setAuthModalOpen(true)} />
+        <ReviewSection userProfile={userProfile} onLoginClick={() => setAuthModalOpen(true)} />
       </main>
 
       {/* FOOTER */}
@@ -403,7 +334,6 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap justify-center gap-6">
-            <a href="#manuals" className="hover:text-white">Manuals</a>
             <a href="#pricing" className="hover:text-white">Pricing</a>
             <a href="#howitworks" className="hover:text-white">How It Works</a>
             <a href="#rewards" className="hover:text-white">Rewards</a>

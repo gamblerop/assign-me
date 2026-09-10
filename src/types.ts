@@ -23,7 +23,8 @@ export interface Order {
   handwriting: 'Printed' | 'Cursive';
   qty: string; // e.g., "10 Pages" or "Full Manual"
   qtyValue: number;
-  content: 'Upload' | 'AI Content';
+  content?: string;
+  instructions?: string;
   referenceFileUrl?: string;
   referenceFileName?: string;
   aiContentDescription?: string;
