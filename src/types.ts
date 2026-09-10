@@ -7,7 +7,6 @@ export interface UserProfile {
   ordersCount: number;
   joined: string;
   role: 'admin' | 'user';
-  passwordHash?: string;
 }
 
 export interface Order {
@@ -25,6 +24,9 @@ export interface Order {
   qty: string; // e.g., "10 Pages" or "Full Manual"
   qtyValue: number;
   content: 'Upload' | 'AI Content';
+  referenceFileUrl?: string;
+  referenceFileName?: string;
+  aiContentDescription?: string;
   deliveryDate: string;
   urgent: boolean;
   basePrice: number;
@@ -35,7 +37,6 @@ export interface Order {
   createdAt: string;
   images?: string[]; // base64 compressed dataUrls
   notes?: string;
-  passwordHash?: string;
 }
 
 export interface Review {
