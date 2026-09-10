@@ -16,7 +16,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Standard (default) Firestore database for your own project.
+// Standard (default) Firestore database for your own project.git commit -m "Fix Firebase authentication and Firestore permissions"
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
