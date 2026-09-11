@@ -13,7 +13,7 @@ import {
   increment,
   writeBatch,
   limit,
-  Timestamp
+  Timestamp,
 } from 'firebase/firestore';
 
 import { db } from '../firebase';
@@ -22,29 +22,24 @@ import {
   Order,
   Review,
   SystemNotification,
-  UserProfile
+  UserProfile,
 } from '../types';
-
 
 // =====================================================
 // SEED INITIAL DATA
 // =====================================================
 
 export async function seedInitialData() {
-
   try {
-
     // ==============================
     // HOSTELS
     // ==============================
 
-    const hostelSnap =
-      await getDocs(
-        collection(db, 'hostels')
-      );
+    const hostelSnap = await getDocs(
+      collection(db, 'hostels')
+    );
 
     if (hostelSnap.empty) {
-
       const initialHostels = [
         'Kalpana Chawla',
         'Meenakshi',
@@ -65,48 +60,40 @@ export async function seedInitialData() {
         'N Block',
         'Mullai',
         'Kopperundevi',
-        'Manorinjitam'
+        'Manorinjitam',
       ];
 
-      const batch =
-        writeBatch(db);
+      const batch = writeBatch(db);
 
       initialHostels.forEach((name) => {
-
-        const docRef =
-          doc(collection(db, 'hostels'));
+        const docRef = doc(
+          collection(db, 'hostels')
+        );
 
         batch.set(docRef, {
           id: docRef.id,
           name,
-          receiver:
-            'Hostel Manager / Office Room',
+          receiver: 'Hostel Manager / Office Room',
           ordersCount: 0,
-          revenue: 0
+          revenue: 0,
         });
       });
 
       await batch.commit();
 
-      console.log(
-        'Seeded initial hostels'
-      );
+      console.log('Seeded initial hostels');
     }
-
 
     // ==============================
     // SERVICES
     // ==============================
 
-    const serviceSnap =
-      await getDocs(
-        collection(db, 'services')
-      );
+    const serviceSnap = await getDocs(
+      collection(db, 'services')
+    );
 
     if (serviceSnap.empty) {
-
       const initialServices = [
-
         {
           name: 'A4 Assignment',
           description:
@@ -116,10 +103,9 @@ export async function seedInitialData() {
           features: [
             'Neat & Clear Writing',
             'On-Time Delivery',
-            'Affordable Pricing'
-          ]
+            'Affordable Pricing',
+          ],
         },
-
         {
           name: 'A3 Sheets',
           description:
@@ -129,10 +115,9 @@ export async function seedInitialData() {
           features: [
             'High Quality Sheets',
             'Perfect drawings/graphs',
-            'Colors available'
-          ]
+            'Colors available',
+          ],
         },
-
         {
           name: 'Manuals',
           description:
@@ -142,42 +127,35 @@ export async function seedInitialData() {
           features: [
             'All departments',
             'Pre-filled or customized option',
-            'Best value bundle'
-          ]
-        }
-
+            'Best value bundle',
+          ],
+        },
       ];
 
-      const batch =
-        writeBatch(db);
+      const batch = writeBatch(db);
 
-      initialServices.forEach((svc) => {
-
-        const docRef =
-          doc(collection(db, 'services'));
+      initialServices.forEach((service) => {
+        const docRef = doc(
+          collection(db, 'services')
+        );
 
         batch.set(docRef, {
           id: docRef.id,
-          ...svc
+          ...service,
         });
       });
 
       await batch.commit();
 
-      console.log(
-        'Seeded initial services'
-      );
+      console.log('Seeded initial services');
     }
-
-  } catch (err) {
-
+  } catch (error) {
     console.error(
       'Error seeding initial data:',
-      err
+      error
     );
   }
 }
-
 
 // =====================================================
 // USER PROFILE
@@ -186,71 +164,39 @@ export async function seedInitialData() {
 export async function getUserProfile(
   uid: string
 ): Promise<UserProfile | null> {
-
-  const docSnap =
-    await getDoc(
-      doc(db, 'users', uid)
-    );
+  const docSnap = await getDoc(
+    doc(db, 'users', uid)
+  );
 
   if (docSnap.exists()) {
-
     return docSnap.data() as UserProfile;
   }
 
   return null;
 }
 
-
 export async function createUserProfile(
   uid: string,
   data: Omit<
     UserProfile,
-    'id' |
-    'points' |
-    'ordersCount' |
-    'role' |
-    'joined'
+    'id' | 'points' | 'ordersCount' | 'role' | 'joined'
   >
 ) {
-
-  const userRef =
-    doc(db, 'users', uid);
+  const userRef = doc(db, 'users', uid);
 
   const profile: UserProfile = {
-
     id: uid,
-
     ...data,
-
     points: 0,
-
     ordersCount: 0,
-
-    joined:
-      new Date().toLocaleDateString(),
-
-    role: 'user'
+    joined: new Date().toLocaleDateString(),
+    role: 'user',
   };
 
-  /*
-   * IMPORTANT:
-   *
-   * We only create the user's profile here.
-   *
-   * We DO NOT create an admin notification
-   * from the client because your Firestore
-   * rules correctly prevent normal users from
-   * writing arbitrary admin notifications.
-   */
-
-  await setDoc(
-    userRef,
-    profile
-  );
+  await setDoc(userRef, profile);
 
   return profile;
 }
-
 
 // =====================================================
 // ORDERS
@@ -259,143 +205,129 @@ export async function createUserProfile(
 export async function createOrder(
   orderData: Omit<
     Order,
-    'id' |
-    'createdAt' |
-    'status'
+    'id' | 'createdAt' | 'status'
   > & {
-    id?: string
+    id?: string;
   }
 ) {
-
   const orderId =
     orderData.id ||
-    '#AM' +
-    Math.floor(
-      100000 +
-      Math.random() * 900000
-    );
+    '#AM' + Math.floor(100000 + Math.random() * 900000);
+
+  const createdAt = new Date().toISOString();
 
   const fullOrder: Order = {
-
     ...orderData,
-
     id: orderId,
-
     status: 'Pending',
-
-    createdAt:
-      new Date().toISOString()
+    createdAt,
   };
 
-  await setDoc(
-    doc(db, 'orders', orderId),
-    fullOrder
+  const batch = writeBatch(db);
+
+  // ==============================
+  // CREATE ORDER
+  // ==============================
+
+  const orderRef = doc(
+    db,
+    'orders',
+    orderId
   );
 
+  batch.set(orderRef, fullOrder);
 
   // ==============================
-  // USER ORDER COUNT
+  // UPDATE USER ORDER COUNT
   // ==============================
 
   if (orderData.userId) {
+    const userRef = doc(
+      db,
+      'users',
+      orderData.userId
+    );
 
-    const userRef =
-      doc(
-        db,
-        'users',
-        orderData.userId
-      );
-
-    await updateDoc(
+    batch.set(
       userRef,
       {
-        ordersCount:
-          increment(1)
+        ordersCount: increment(1),
+      },
+      {
+        merge: true,
       }
     );
   }
 
-
   // ==============================
-  // USER NOTIFICATION
+  // CREATE USER NOTIFICATION
   // ==============================
 
   if (orderData.userId) {
-
-    await addDoc(
-      collection(
-        db,
-        'notifications'
-      ),
-      {
-        title:
-          'Order Received 📝',
-
-        desc:
-          `Your order ${orderId} has been successfully received and is pending admin review.`,
-
-        type: 'order',
-
-        userId:
-          orderData.userId,
-
-        createdAt:
-          new Date().toISOString(),
-
-        read: false
-      }
+    const notificationRef = doc(
+      collection(db, 'notifications')
     );
+
+    batch.set(notificationRef, {
+      title: 'Order Received 📝',
+      desc: `Your order ${orderId} has been successfully received and is pending admin review.`,
+      type: 'order',
+      userId: orderData.userId,
+      createdAt,
+      read: false,
+    });
   }
 
-
   // ==============================
-  // HOSTEL STATISTICS
+  // UPDATE HOSTEL STATISTICS
   // ==============================
 
   if (
     orderData.userType === 'Hosteller' &&
     orderData.hostel
   ) {
+    const hostelQuery = query(
+      collection(db, 'hostels'),
+      where('name', '==', orderData.hostel),
+      limit(1)
+    );
 
-    const hostelSnap =
-      await getDocs(
-        query(
-          collection(db, 'hostels'),
-          where(
-            'name',
-            '==',
-            orderData.hostel
-          )
-        )
-      );
+    const hostelSnap = await getDocs(
+      hostelQuery
+    );
 
     if (!hostelSnap.empty) {
+      const hostelDoc = hostelSnap.docs[0];
 
-      const hostelDoc =
-        hostelSnap.docs[0];
+      const hostelRef = doc(
+        db,
+        'hostels',
+        hostelDoc.id
+      );
 
-      await updateDoc(
-        doc(
-          db,
-          'hostels',
-          hostelDoc.id
-        ),
+      batch.set(
+        hostelRef,
         {
-          ordersCount:
-            increment(1),
-
-          revenue:
-            increment(
-              orderData.total
-            )
+          ordersCount: increment(1),
+          revenue: increment(
+            Number(orderData.total) || 0
+          ),
+        },
+        {
+          merge: true,
         }
       );
     }
   }
 
+  // ==============================
+  // COMMIT ALL OPERATIONS
+  // ==============================
+
+  await batch.commit();
+
   return fullOrder;
 }
-
 
 // =====================================================
 // UPDATE ORDER STATUS
@@ -405,79 +337,67 @@ export async function updateOrderStatus(
   orderId: string,
   status: Order['status']
 ) {
-
-  const orderRef =
-    doc(
-      db,
-      'orders',
-      orderId
-    );
-
-  await updateDoc(
-    orderRef,
-    { status }
+  const orderRef = doc(
+    db,
+    'orders',
+    orderId
   );
 
+  await updateDoc(orderRef, {
+    status,
+  });
 
-  const snap =
-    await getDoc(orderRef);
+  const snap = await getDoc(orderRef);
 
   if (!snap.exists()) {
     return;
   }
 
-  const order =
-    snap.data() as Order;
-
+  const order = snap.data() as Order;
 
   if (!order.userId) {
     return;
   }
-
 
   // ==============================
   // REWARD POINTS
   // ==============================
 
   if (status === 'Completed') {
+    const batch = writeBatch(db);
 
-    await updateDoc(
-      doc(
-        db,
-        'users',
-        order.userId
-      ),
+    const userRef = doc(
+      db,
+      'users',
+      order.userId
+    );
+
+    batch.set(
+      userRef,
       {
-        points:
-          increment(50)
+        points: increment(50),
+      },
+      {
+        merge: true,
       }
     );
 
-    await addDoc(
-      collection(
-        db,
-        'notifications'
-      ),
-      {
-        title:
-          'Reward Points Added 🎁',
-
-        desc:
-          'You earned +50 points for completing your assignment order!',
-
-        userId:
-          order.userId,
-
-        type: 'system',
-
-        createdAt:
-          new Date().toISOString(),
-
-        read: false
-      }
+    const notificationRef = doc(
+      collection(db, 'notifications')
     );
+
+    batch.set(notificationRef, {
+      title: 'Reward Points Added 🎁',
+      desc:
+        'You earned +50 points for completing your assignment order!',
+      userId: order.userId,
+      type: 'system',
+      createdAt: new Date().toISOString(),
+      read: false,
+    });
+
+    await batch.commit();
   }
-
 
   // ==============================
   // USER ORDER NOTIFICATION
@@ -487,44 +407,29 @@ export async function updateOrderStatus(
   let desc = '';
 
   if (status === 'In Progress') {
+    title = 'Order Accepted 🔄';
 
-    title =
-      'Order Accepted 🔄';
-
-    desc =
-      `Your order ${orderId} has been accepted by the admin and is currently being processed.`;
-
+    desc = `Your order ${orderId} has been accepted by the admin and is currently being processed.`;
   } else if (status === 'Rejected') {
+    title = 'Order Rejected ❌';
 
-    title =
-      'Order Rejected ❌';
-
-    desc =
-      `Your order ${orderId} has been cancelled/rejected. Please contact admin on WhatsApp for details.`;
+    desc = `Your order ${orderId} has been cancelled/rejected. Please contact admin on WhatsApp for details.`;
   }
 
-
   if (title) {
-
     await addDoc(
-      collection(
-        db,
-        'notifications'
-      ),
+      collection(db, 'notifications'),
       {
         title,
         desc,
         type: 'order',
-        userId:
-          order.userId,
-        createdAt:
-          new Date().toISOString(),
-        read: false
+        userId: order.userId,
+        createdAt: new Date().toISOString(),
+        read: false,
       }
     );
   }
 }
-
 
 // =====================================================
 // STANDALONE PHOTO UPLOAD
@@ -539,141 +444,98 @@ export async function uploadStandalonePhoto(
     dataUrl: string;
   }
 ) {
-
-  const docRef =
-    doc(
-      collection(
-        db,
-        'uploaded_photos'
-      )
-    );
+  const docRef = doc(
+    collection(db, 'uploaded_photos')
+  );
 
   const payload = {
-
     id: docRef.id,
-
     ...photo,
-
-    date:
-      new Date().toLocaleString(
-        'en-IN',
-        {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }
-      ),
-
-    createdAt:
-      new Date().toISOString()
+    date: new Date().toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    createdAt: new Date().toISOString(),
   };
 
-  await setDoc(
-    docRef,
-    payload
-  );
+  await setDoc(docRef, payload);
 
   return payload;
 }
-
 
 // =====================================================
 // REVIEWS
 // =====================================================
 
 export async function submitReview(
-  reviewData:
-    Omit<Review, 'id' | 'date'>
+  reviewData: Omit<Review, 'id' | 'date'>
 ) {
-
-  const docRef =
-    doc(
-      collection(
-        db,
-        'reviews'
-      )
-    );
-
-  const review: Review = {
-
-    ...reviewData,
-
-    id: docRef.id,
-
-    date:
-      new Date().toLocaleDateString(
-        'en-IN',
-        {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric'
-        }
-      )
-  };
-
-  await setDoc(
-    docRef,
-    review
+  const docRef = doc(
+    collection(db, 'reviews')
   );
 
+  const review: Review = {
+    ...reviewData,
+    id: docRef.id,
+    date: new Date().toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }),
+  };
+
+  await setDoc(docRef, review);
 
   // ==============================
   // REWARD USER
   // ==============================
 
   if (reviewData.userId) {
+    const batch = writeBatch(db);
 
-    await updateDoc(
-      doc(
-        db,
-        'users',
-        reviewData.userId
-      ),
+    const userRef = doc(
+      db,
+      'users',
+      reviewData.userId
+    );
+
+    batch.set(
+      userRef,
       {
-        points:
-          increment(20)
+        points: increment(20),
+      },
+      {
+        merge: true,
       }
     );
 
-    await addDoc(
-      collection(
-        db,
-        'notifications'
-      ),
-      {
-        title:
-          'Review Bonus Points Added 🎁',
-
-        desc:
-          'You earned +20 points for writing a review!',
-
-        userId:
-          reviewData.userId,
-
-        type: 'system',
-
-        createdAt:
-          new Date().toISOString(),
-
-        read: false
-      }
+    const notificationRef = doc(
+      collection(db, 'notifications')
     );
+
+    batch.set(notificationRef, {
+      title: 'Review Bonus Points Added 🎁',
+      desc:
+        'You earned +20 points for writing a review!',
+      userId: reviewData.userId,
+      type: 'system',
+      createdAt: new Date().toISOString(),
+      read: false,
+    });
+
+    await batch.commit();
   }
 
   return review;
 }
 
-
 // =====================================================
 // CURRENCY HELPER
 // =====================================================
 
-function rupees(n: number) {
-
-  return (
-    '₹' +
-    n.toLocaleString('en-IN')
-  );
+export function rupees(n: number) {
+  return '₹' + n.toLocaleString('en-IN');
 }

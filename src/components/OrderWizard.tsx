@@ -14,6 +14,18 @@ import {
 // =========================================================================
 export const WHATSAPP_BUSINESS_NUMBER = '916374030823'; // Format: country code + number without +, e.g. '916374030823'
 
+// Moved outside the component so it's a stable reference (not re-created
+// every render) and can double as the INITIAL state for hostelList below,
+// instead of starting empty and waiting on a network round-trip to show
+// anything at all.
+const FALLBACK_HOSTELS = [
+  'Kalpana Chawla', 'Meenakshi', 'Kaparadeivi', 'ESQ A', 'ESQ B',
+  'Sannasi A', 'Sannasi C', 'Began', 'Paari (G Block)', 'Kaari (H Block)',
+  'Oori (I Block)', 'Adhiyaman (J Block)', 'Nelson Mandela Hostel (NRI)',
+  'Agasthiyar (Dormitory)', 'Melligai', 'Senbagam', 'N Block', 'Mullai',
+  'Kopperundevi', 'Manorinjitam'
+];
+
 interface OrderWizardProps {
   userProfile: any;
   onOrderSuccess: () => void;
@@ -27,7 +39,11 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
   const [hostel, setHostel] = useState('');
   const [deliveryPoint, setDeliveryPoint] = useState('');
   const [hostelSearch, setHostelSearch] = useState('');
-  const [hostelList, setHostelList] = useState<string[]>([]);
+  // FIX: seed with the fallback list immediately instead of [] so step 2
+  // has hostel buttons to show on the very first render, with zero wait.
+  // The Firestore fetch below still runs, and silently replaces this
+  // with the live list once it resolves (usually identical anyway).
+  const [hostelList, setHostelList] = useState<string[]>(FALLBACK_HOSTELS);
   
   // Step 3
   const [userName, setUserName] = useState('');
@@ -75,7 +91,10 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
     { name: 'Other Manuals', emoji: '📚', perPrice: 40, fullPrice: 450, unit: 'manual' }
   ];
 
-  // Fetch Hostels on mount
+  // Fetch Hostels on mount.
+  // FIX: hostelList already starts populated with FALLBACK_HOSTELS (see
+  // useState above), so this fetch is now a silent background refresh
+  // rather than something the UI has to wait on before showing anything.
   useEffect(() => {
     const fetchHostels = async () => {
       try {
@@ -83,18 +102,12 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
         if (!snap.empty) {
           const names = snap.docs.map(doc => doc.data().name);
           setHostelList(names);
-        } else {
-          // Fallback static list
-          setHostelList([
-            'Kalpana Chawla', 'Meenakshi', 'Kaparadeivi', 'ESQ A', 'ESQ B',
-            'Sannasi A', 'Sannasi C', 'Began', 'Paari (G Block)', 'Kaari (H Block)',
-            'Oori (I Block)', 'Adhiyaman (J Block)', 'Nelson Mandela Hostel (NRI)',
-            'Agasthiyar (Dormitory)', 'Melligai', 'Senbagam', 'N Block', 'Mullai',
-            'Kopperundevi', 'Manorinjitam'
-          ]);
         }
+        // If empty, we simply keep the FALLBACK_HOSTELS already showing —
+        // no need to set it again.
       } catch (err) {
         console.error('Error fetching hostels:', err);
+        // Keep showing FALLBACK_HOSTELS on error too.
       }
     };
 
@@ -226,42 +239,62 @@ export default function OrderWizard({ userProfile, onOrderSuccess }: OrderWizard
     setQty(1); // Reset to 1
   };
 
-  const submitOrderAction = async () => {
-    setLoading(true);
-    try {
-      const orderLabelQty = fullManual ? 'Full Manual' :
-                           manualUnit === 'exercise' ? `${qty} Exercises` :
-                           manualUnit === 'experiment' ? `${qty} Experiments` :
-                           service === 'A3 Sheets' ? `${qty} Sheets` : `${qty} Pages`;
+  // ==========================================================================
+  // SUBMIT — REWRITTEN FOR SPEED + RELIABILITY
+  // ==========================================================================
+  //
+  // Previously: await createOrder(...) happened FIRST, and window.open()
+  // for WhatsApp came after. Two problems with that:
+  //
+  //   1. Perceived speed: the user stared at "Submitting Order..." for as
+  //      long as Firestore took to respond, even though WhatsApp doesn't
+  //      need the Firestore write to have finished first.
+  //
+  //   2. Popup blocking: browsers only treat window.open() as "triggered
+  //      directly by the user's click" (and therefore exempt from the
+  //      popup blocker) when it's called SYNCHRONOUSLY inside the click
+  //      handler, before any `await`. Once an `await` has run first, the
+  //      browser sees enough of a delay that it may silently block the
+  //      new tab — so on a slow connection, some users may not have even
+  //      been getting to WhatsApp at all, not just waiting a long time.
+  //
+  // Fix: build the order data + WhatsApp message synchronously, open
+  // WhatsApp FIRST (no awaits before this line), then save to Firestore
+  // in the background. The order was already given a client-generated ID
+  // (draftOrderId) before this function runs, so nothing is lost even if
+  // the Firestore write finishes after the user has already left the page.
+  const submitOrderAction = () => {
+    const orderLabelQty = fullManual ? 'Full Manual' :
+                         manualUnit === 'exercise' ? `${qty} Exercises` :
+                         manualUnit === 'experiment' ? `${qty} Experiments` :
+                         service === 'A3 Sheets' ? `${qty} Sheets` : `${qty} Pages`;
 
-      const orderData = {
-        id: draftOrderId,
-        userId: userProfile?.id || '',
-        name: userName,
-        email: userProfile?.email || '',
-        userType,
-        hostel: userType === 'Hosteller' ? hostel : '',
-        pickup: userType === 'Day Scholar' ? 'Gate 51 — Gents Hostel' : '',
-        delivery: userType === 'Day Scholar' ? deliveryPoint : '',
-        service: service === 'Manuals' ? manualType : service,
-        manualType: service === 'Manuals' ? manualType : '',
-        handwriting,
-        qty: orderLabelQty,
-        qtyValue: qty,
-        instructions: instructions.trim(),
-        notes: instructions.trim(),
-        deliveryDate,
-        urgent: isTomorrow,
-        basePrice,
-        urgentFee,
-        discount,
-        total
-      };
+    const orderData = {
+      id: draftOrderId,
+      userId: userProfile?.id || '',
+      name: userName,
+      email: userProfile?.email || '',
+      userType,
+      hostel: userType === 'Hosteller' ? hostel : '',
+      pickup: userType === 'Day Scholar' ? 'Gate 51 — Gents Hostel' : '',
+      delivery: userType === 'Day Scholar' ? deliveryPoint : '',
+      service: service === 'Manuals' ? manualType : service,
+      manualType: service === 'Manuals' ? manualType : '',
+      handwriting,
+      qty: orderLabelQty,
+      qtyValue: qty,
+      instructions: instructions.trim(),
+      notes: instructions.trim(),
+      deliveryDate,
+      urgent: isTomorrow,
+      basePrice,
+      urgentFee,
+      discount,
+      total
+    };
 
-      await createOrder(orderData);
-
-      // Construct WhatsApp message with formatted order specs and instructions
-      const orderSummaryText = `Hi Assign Me! I just placed an assignment order.
+    // Construct WhatsApp message with formatted order specs and instructions
+    const orderSummaryText = `Hi Assign Me! I just placed an assignment order.
 
 *Order ID:* ${draftOrderId}
 *Name:* ${userName}
@@ -279,29 +312,39 @@ ${instructions.trim()}
 
 Please confirm my order. Thank you!`;
 
-      const msg = encodeURIComponent(orderSummaryText);
-      window.open(`https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${msg}`, '_blank');
+    const msg = encodeURIComponent(orderSummaryText);
+    const whatsappUrl = `https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${msg}`;
 
-      onOrderSuccess();
-      setStep(1); // Reset step
-      // Reset variables
-      setDraftOrderId('#AM' + Math.floor(100000 + Math.random() * 900000));
-      setHostel('');
-      setDeliveryPoint('');
-      setService('A4 Assignment');
-      setServicePrice(10);
-      setManualType('');
-      setFullManual(false);
-      setQty(10);
-      setInstructions('');
-      setDeliveryDate('');
-      setIsTomorrow(false);
-    } catch (err) {
-      console.error(err);
-      alert('Order submission failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    // OPEN WHATSAPP IMMEDIATELY — this is the very first thing that
+    // happens, synchronously, before any network/database call.
+    window.open(whatsappUrl, '_blank');
+
+    // Give the user instant visual feedback and reset the form right
+    // away, rather than leaving "Submitting Order..." spinning while
+    // Firestore saves in the background.
+    onOrderSuccess();
+    setStep(1);
+    const nextDraftId = '#AM' + Math.floor(100000 + Math.random() * 900000);
+    setDraftOrderId(nextDraftId);
+    setHostel('');
+    setDeliveryPoint('');
+    setService('A4 Assignment');
+    setServicePrice(10);
+    setManualType('');
+    setFullManual(false);
+    setQty(10);
+    setInstructions('');
+    setDeliveryDate('');
+    setIsTomorrow(false);
+
+    // Save to Firestore in the background. The user has already reached
+    // WhatsApp by this point, so a slow or even failed write here no
+    // longer blocks or delays them — just log it for now.
+    createOrder(orderData).catch((err) => {
+      console.error('Order failed to save in the background (user was already redirected to WhatsApp):', err);
+      // Optional: report this to an error-tracking service, or queue a
+      // retry, since the admin dashboard won't see this order otherwise.
+    });
   };
 
   // Filter hostels
@@ -900,10 +943,9 @@ Please confirm my order. Thank you!`;
 
                   <button
                     onClick={submitOrderAction}
-                    disabled={loading}
                     className="w-full bg-[#1a6fff] hover:bg-[#1558cc] text-white py-3.5 rounded-xl font-bold text-base cursor-pointer shadow-lg shadow-[#1a6fff]/30 duration-200 flex items-center justify-center gap-2"
                   >
-                    {loading ? 'Submitting Order...' : 'Confirm & Place Order'}
+                    Confirm & Place Order
                   </button>
 
                   <p className="text-center text-[10px] text-[#7da3cc] max-w-[400px] mx-auto leading-relaxed">
@@ -941,4 +983,3 @@ Please confirm my order. Thank you!`;
     </section>
   );
 }
-
