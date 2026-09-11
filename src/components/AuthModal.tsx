@@ -378,117 +378,97 @@ export default function AuthModal({
       setLoading(false);
     }
   };
+const handleSignup = async (
+  event: React.FormEvent<HTMLFormElement>,
+) => {
+  event.preventDefault();
 
-  const handleSignup = async (
-    event: React.FormEvent<HTMLFormElement>,
-  ) => {
-    event.preventDefault();
+  setError('');
+  setSuccessMsg('');
 
-    setError('');
-    setSuccessMsg('');
+  const name = suName.trim();
+  const email = suEmail.trim().toLowerCase();
+  const phone = suPhone.trim();
 
-    const name = suName.trim();
-    const email = suEmail.trim().toLowerCase();
-    const phone = suPhone.trim();
+  if (!name || !email || !suPassword) {
+    setError('Please fill in all required fields.');
+    return;
+  }
 
-    if (!name || !email || !suPassword) {
-      setError('Please fill in all required fields.');
-      return;
-    }
+  if (suPassword.length < 6) {
+    setError('Password must be at least 6 characters.');
+    return;
+  }
 
-    if (suPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
+  setLoading(true);
 
-    setLoading(true);
+  try {
+    // Create the Firebase Authentication account first.
+    // Do not read the users collection before authentication.
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      suPassword,
+    );
 
+    const user = userCredential.user;
+
+    // Update the Firebase Auth display name.
+    await import('firebase/auth').then(({ updateProfile }) =>
+      updateProfile(user, {
+        displayName: name,
+      }),
+    );
+
+    // Send verification email.
     try {
-      const existingUserQuery = query(
-        collection(db, 'users'),
-        where('email', '==', email),
+      await sendEmailVerification(user);
+    } catch (verificationError) {
+      console.warn(
+        'Verification email could not be sent:',
+        verificationError,
       );
-
-      const existingUsers = await getDocs(
-        existingUserQuery,
-      );
-
-      if (!existingUsers.empty) {
-        setError('An account with this email already exists.');
-        return;
-      }
-
-      const userCredential =
-        await createUserWithEmailAndPassword(
-          auth,
-          email,
-          suPassword,
-        );
-
-      const user = userCredential.user;
-
-      try {
-        await sendEmailVerification(user);
-      } catch (verificationError) {
-        console.warn(
-          'Verification email could not be sent:',
-          verificationError,
-        );
-      }
-
-      const profile = await createUserProfile(user.uid, {
-        name,
-        email,
-        phone,
-      });
-
-      /*
-       * This hash is kept only for legacy compatibility.
-       * Firebase Authentication remains the main authentication method.
-       */
-      const passwordHash = await hashPassword(suPassword);
-
-      await setDoc(
-        doc(db, 'users', user.uid),
-        {
-          ...profile,
-          passwordHash,
-        },
-        { merge: true },
-      );
-
-      setRegisteredProfile(profile);
-      setSuEmail(email);
-      setTab('verification_pending');
-
-      setSuccessMsg(
-        'Account created successfully. Please verify your email.',
-      );
-    } catch (signupError: any) {
-      console.error('Signup error:', signupError);
-
-      if (
-        signupError.code === 'auth/email-already-in-use'
-      ) {
-        setError('An account with this email already exists.');
-      } else if (
-        signupError.code === 'auth/invalid-email'
-      ) {
-        setError('Please enter a valid email address.');
-      } else if (
-        signupError.code === 'auth/weak-password'
-      ) {
-        setError('Please choose a stronger password.');
-      } else {
-        setError(
-          signupError.message || 'Registration failed.',
-        );
-      }
-    } finally {
-      setLoading(false);
     }
-  };
 
+    // Now the user is authenticated, so Firestore rules allow
+    // creation of users/{user.uid}.
+    const profile = await createUserProfile(user.uid, {
+      name,
+      email,
+      phone,
+    });
+
+    setRegisteredProfile(profile);
+    setSuEmail(email);
+    setTab('verification_pending');
+
+    setSuccessMsg(
+      'Account created successfully. Please verify your email.',
+    );
+  } catch (signupError: any) {
+    console.error('Signup error code:', signupError?.code);
+    console.error('Signup error message:', signupError?.message);
+    console.error('Full signup error:', signupError);
+
+    if (signupError?.code === 'auth/email-already-in-use') {
+      setError('An account with this email already exists.');
+    } else if (signupError?.code === 'auth/invalid-email') {
+      setError('Please enter a valid email address.');
+    } else if (signupError?.code === 'auth/weak-password') {
+      setError('Please choose a stronger password.');
+    } else if (signupError?.code === 'permission-denied') {
+      setError(
+        'Account created, but the profile could not be saved. Check Firestore Rules.',
+      );
+    } else {
+      setError(
+        signupError?.message || 'Registration failed.',
+      );
+    }
+  } finally {
+    setLoading(false);
+  }
+};
   const handleCheckEmailVerified = async () => {
     setError('');
     setSuccessMsg('');
