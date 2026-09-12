@@ -468,6 +468,7 @@ const handleSignup = async (
   } finally {
     setLoading(false);
   }
+  
 };
   const handleCheckEmailVerified = async () => {
     setError('');
